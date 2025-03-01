@@ -17,6 +17,7 @@ jobs:
     - name: Log in to GHCR
       run: echo "${{ secrets.GH_PAT }}" | docker login ghcr.io -u mert2m --password-stdin
 
+
     - name: Build Docker Image
       run: docker build . --tag ghcr.io/mert2m/action:${{ github.sha }}
 
