@@ -3,6 +3,8 @@ name: Docker Image CI
 on:
   push:
     branches: [ "main" ]
+    tags:
+      - 'v*' 
   pull_request:
     branches: [ "main" ]
 
@@ -18,11 +20,38 @@ jobs:
       run: echo "${{ secrets.GH_PAT }}" | docker login ghcr.io -u cloudbench1 --password-stdin
 
     - name: Build Docker Image
-      run: docker build . --tag ghcr.io/cloudbench1/action:${{ github.sha }}
+      run: |
+        IMAGE_TAG=ghcr.io/cloudbench1/action:${{ github.sha }}
+        
+        # Check if a version tag is present
+        if [[ $GITHUB_REF == refs/tags/* ]]; then
+          VERSION_TAG="ghcr.io/cloudbench1/action:${GITHUB_REF#refs/tags/}"
+          docker build . --tag $IMAGE_TAG --tag $VERSION_TAG
+        else
+          docker build . --tag $IMAGE_TAG
+        fi
 
     - name: Push Docker Image
-      run: docker push ghcr.io/cloudbench1/action:${{ github.sha }}
+      run: |
+        IMAGE_TAG=ghcr.io/cloudbench1/action:${{ github.sha }}
+        
+        # Push the main image
+        docker push $IMAGE_TAG
+        
+        # If a version tag is present, push that as well
+        if [[ $GITHUB_REF == refs/tags/* ]]; then
+          VERSION_TAG="ghcr.io/cloudbench1/action:${GITHUB_REF#refs/tags/}"
+          docker push $VERSION_TAG
+        fi
 
+    - name: Send Notification Email
+      run: |
+        curl -s --request POST \
+          --url 'https://api.mailgun.net/v3/YOUR_DOMAIN_NAME/messages' \
+          --user "api:${{ secrets.MAILGUN_API_KEY }}" \
+          --form from="no-reply@YOUR_DOMAIN_NAME" \
+          --form to="YOUR_EMAIL_ADDRESS" \
+          --form subject="GitHub Actions Build Completed" \
+          --form text="The Docker image has been successfully built and pushed to GitHub Container Registry. SHA: ${{ github.sha }}"
 
-   
 
